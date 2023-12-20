@@ -4,8 +4,9 @@ use regex::Regex;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
 use std::error::Error;
-use std::io;
 use std::time::Instant;
+use std::env;
+use tokio::task::spawn_blocking;
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::Client::new();
@@ -51,51 +52,48 @@ async fn get_links_from_page(url: &str) -> Result<HashSet<String>, reqwest::Erro
 async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, Box<dyn Error>> {
 	
     let mut searched = HashSet::new();
-    let mut found = HashSet::new();
-    let mut results = get_links_from_page(url).await?;
-
-    found.extend(results.clone());
+    let mut found = get_links_from_page(url).await?;
 
     for _ in 0..depth - 1 {
-        for url in results.iter() {
-            found.extend(get_links_from_page(url).await?);
+		let mut tasks = Vec::new();
+		
+		found.difference(&searched).for_each(|url| {
+			tasks.push(spawn_blocking(|| get_links_from_page(url)));
             searched.insert(url.clone());
+		});
+        
+        for task in tasks {
+			match task.await {
+				Ok(result) => found.extend(result.await.unwrap_or_default()),
+				Err(err) => eprintln!("Error appending task: {}", err),
+			}
         }
-        results = found
-            .difference(&searched)
-            .cloned()
-            .collect();
     }
-    return Ok(found);
+    return Ok(found)
 }
 
 #[tokio::main]
 async fn main() {
 	
-	println!("Please enter a link: ");
-	let mut user_link = String::new();
-	io::stdin().read_line(&mut user_link).expect("Failed to read line");
-	
-	println!("Please enter a depth: ");
-	let mut user_depth = String::new();
-	io::stdin().read_line(&mut user_depth).expect("Failed to read line");
-	
-	let user_depth: i32 = match user_depth.trim().parse() {
-             Ok(num) => num,
-             Err(_) => panic!("Invalid input")
-        };
+	let args: Vec<String> = env::args().collect();
+
+    let url = &args[1];
+    let depth = args[2].parse().unwrap();
+
 	println!("Starting Search...");
 
 	let start_time = Instant::now();
-	match recursive_get_links(&user_link, user_depth).await {
+	
+	match recursive_get_links(&url, depth).await {
         Ok(links) => {
-            println!("Found links: {:?}", links);
+            println!("Found links: {:?}\nNumber of links: {}", links, links.len());
         }
         Err(err) => {
-            eprintln!("Error: {}", err);
+            eprintln!("Error. Search ended prematurely: {}", err);
         }
     }
     let end_time = Instant::now();
+    
     let elapsed_time = end_time.duration_since(start_time);
     println!("Elapsed time: {} secs", elapsed_time.as_secs());
 }
