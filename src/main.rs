@@ -55,10 +55,6 @@ async fn recursive_get_links(url: &str, depth: i32) -> usize {
 	};
 	
 	let mut found = results.clone();
-	
-	println!("{:?}-", results);
-	
-    
 
     for _ in 0..depth - 1 {
 		
