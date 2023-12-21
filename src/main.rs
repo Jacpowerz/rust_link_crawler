@@ -69,8 +69,7 @@ async fn recursive_get_links(url: &str, depth: i32) -> usize {
             .difference(&searched)
             .cloned()
             .collect();
-            
-        println!("{:?}-", results);
+	    
         num_links += results.len();
         
         
