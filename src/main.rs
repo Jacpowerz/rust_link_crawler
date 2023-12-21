@@ -63,17 +63,13 @@ async fn recursive_get_links(url: &str, depth: i32) -> usize {
         for url in results.iter() {
             found.extend(get_links_from_page(url).await.unwrap());
             searched.insert(url.clone());
-            println!("{:?}-", found);
         }
         
         results = found
             .difference(&searched)
             .cloned()
             .collect();
-            
-        
         num_links += results.len();
-        
         
 		found = HashSet::new();
     }
