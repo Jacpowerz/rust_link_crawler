@@ -3,9 +3,9 @@ use scraper::{Html, Selector};
 use regex::Regex;
 use lazy_static::lazy_static;
 use std::collections::HashSet;
-use std::error::Error;
-use std::io;
 use std::time::Instant;
+use std::env;
+use std::error::Error;
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::Client::new();
@@ -31,8 +31,7 @@ async fn get_links_from_page(url: &str) -> Result<HashSet<String>, reqwest::Erro
 						if let Some(matched) = captures.get(1) {
 							links.insert(
 								String::from(
-									matched
-										.as_str()
+									matched.as_str()
 								)
 							);
 						}
@@ -42,7 +41,7 @@ async fn get_links_from_page(url: &str) -> Result<HashSet<String>, reqwest::Erro
 			return Ok(links);
 		}
 		Err(err) => {
-			eprintln!("Error processing {}: {}", url, err);
+			eprintln!("Error: {}", err);
             return Ok(HashSet::new());
 		}
 	} 
@@ -54,6 +53,7 @@ async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, B
     let mut found = HashSet::new();
     let mut results = get_links_from_page(url).await?;
 
+	println!("{:?}", results);
     found.extend(results.clone());
 
     for _ in 0..depth - 1 {
@@ -61,10 +61,12 @@ async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, B
             found.extend(get_links_from_page(url).await?);
             searched.insert(url.clone());
         }
+        
         results = found
             .difference(&searched)
             .cloned()
             .collect();
+        println!("{:?}", results);
     }
     return Ok(found);
 }
@@ -72,30 +74,26 @@ async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, B
 #[tokio::main]
 async fn main() {
 	
-	println!("Please enter a link: ");
-	let mut user_link = String::new();
-	io::stdin().read_line(&mut user_link).expect("Failed to read line");
+
+	let args: Vec<String> = env::args().collect();
 	
-	println!("Please enter a depth: ");
-	let mut user_depth = String::new();
-	io::stdin().read_line(&mut user_depth).expect("Failed to read line");
+	if args.len() <= 2 {
+        eprintln!("Please provide command-line arguments.");
+        std::process::exit(1);
+    }
 	
-	let user_depth: i32 = match user_depth.trim().parse() {
-             Ok(num) => num,
-             Err(_) => panic!("Invalid input")
-        };
-	println!("Starting Search...");
+	let url = &args[1];
+    let depth = args[2].parse().unwrap();
+
+	eprintln!("Starting Search...");
 
 	let start_time = Instant::now();
-	match recursive_get_links(&user_link, user_depth).await {
-        Ok(links) => {
-            println!("Found links: {:?}", links);
-        }
-        Err(err) => {
-            eprintln!("Error: {}", err);
-        }
-    }
+	
+	let links = recursive_get_links(&url, depth).await;
+	
     let end_time = Instant::now();
+    
+    eprintln!("Number of links found: {}", links.expect("Couldn't get length").len());
     let elapsed_time = end_time.duration_since(start_time);
-    println!("Elapsed time: {} secs", elapsed_time.as_secs());
+    eprintln!("Elapsed time: {} secs", elapsed_time.as_secs());
 }
