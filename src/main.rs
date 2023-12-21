@@ -53,7 +53,7 @@ async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, B
     let mut found = HashSet::new();
     let mut results = get_links_from_page(url).await?;
 
-	println!("{:?}", results);
+	println!("{:?}--", results);
     found.extend(results.clone());
 
     for _ in 0..depth - 1 {
@@ -66,7 +66,7 @@ async fn recursive_get_links(url: &str, depth: i32) -> Result<HashSet<String>, B
             .difference(&searched)
             .cloned()
             .collect();
-        println!("{:?}", results);
+        println!("{:?}-", results);
     }
     return Ok(found);
 }
